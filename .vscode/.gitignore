@@ -1,0 +1,10 @@
+# Dependency directory
+node_modules
+node_modules/
+
+
+# Project specific ignore
+ logs/
+.build
+.env
+.vscode
