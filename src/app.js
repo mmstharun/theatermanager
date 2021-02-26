@@ -8,33 +8,30 @@ const Inert = require('inert');
 const Vision = require('vision');
 const HapiSwagger = require('hapi-swagger');
 
-let MONGO_USERNAME = "manager";
-let MONGO_HOSTNAME = "localhost";
-let MONGO_PASSWORD = "Man@115";
-let MONGO_PORT = "27017";
-let MONGO_DB = "ticketmanager";
-let HOSTNAME = "localhost";
-let PORT = "3000";
+const auth = require('./auth/authorization');
+
+require('dotenv').config();
 
 const server = new Hapi.Server();
+
+const {
+    MONGO_USERNAME,
+    MONGO_PASSWORD,
+    MONGO_HOSTNAME,
+    MONGO_PORT,
+    MONGO_DB,
+    HOSTNAME,
+    PORT
+} = process.env;
 
 server.connection(
     { "host": `${HOSTNAME}`, "port": `${PORT}` }
 )
 
-// const {
-//     MONGO_USERNAME,
-//     MONGO_PASSWORD,
-//     MONGO_HOSTNAME,
-//     MONGO_PORT,
-//     MONGO_DB
-// } = process.env;
-
 const mongoOptions = {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     connectTimeoutMS: 10000,
-    // read about this
     useFindAndModify: false
 };
 
@@ -45,7 +42,7 @@ const swaggerOptions = {
     }
 };
 
-const url = `mongodb://${MONGO_USERNAME}:${encodeURIComponent(MONGO_PASSWORD)}@${MONGO_HOSTNAME}:${MONGO_PORT}/${MONGO_DB}?authSource=ticketmanager`;
+const url = `mongodb://${MONGO_USERNAME}:${encodeURIComponent(MONGO_PASSWORD)}@${MONGO_HOSTNAME}:${MONGO_PORT}/${MONGO_DB}?authSource=${MONGO_DB}`;
 
 mongoose.connect(url, mongoOptions).then(function () {
     console.log('MongoDB is connected');
@@ -72,3 +69,18 @@ server.register([
 
         })
     });
+
+server.ext('onPreHandler', (request, reply) => {
+    if (request.path.startsWith("/")) {
+        var token = request.raw.req.headers.authorization;
+        if (token === undefined) {
+            return reply.response('Missing Authorization Header').code(401);
+        } else {
+            is_authorized = auth(token);
+            if (!is_authorized) {
+                return reply.response('Not Authorized').code(401);
+            }
+        }
+        return reply.continue();
+    }
+});

@@ -26,7 +26,7 @@ function getAggregationQuery(type, startDate, endDate) {
             }
         ];
     } else if (type === 'visits') {
-        [
+        return [
             {
                 $match: {
                     performance_time: { $gte: startDate, $lt: endDate }
@@ -43,7 +43,7 @@ function getAggregationQuery(type, startDate, endDate) {
                     numberofbookings: { $sum: 1 }
                 }
             }
-        ]
+        ];
     }
 }
 
@@ -81,73 +81,6 @@ module.exports = [
                 var endDate = new Date(request.query.endDate);
                 var data = [];
 
-                var method = request.query.method;
-                var map = new Map();
-                if (method != "" && method === 'js') {
-                    called = true;
-                    var tickets = Tickets.find ({
-                        performance_time: { $gte: startDate, $lt: endDate }
-                    }).lean().exec((err, result) => {
-                        if (err) throw err;
-                        for (val of result) {
-                            var month = monthsForJs[val.performance_time.getMonth()];
-                            if (map.has(month)) {
-                                map.set(month, map.get(month) + 1);
-                            } else {
-                                map.set(month, 1);
-                            }
-                        }
-                        console.log(map);
-                        return h.response(map);
-                    });
-                    // console.log(tickets)
-
-                    // var result = new Promise((resolve, reject) => {
-                    //     let map = new Map();
-                    //     tickets.forEach(ticket => {
-                    //         var month = monthsForJs[ticket.performance_time.getMonth()];
-                    //         if (map.has(month)) {
-                    //             map.set(month, map.get(month) + 1);
-                    //         } else {
-                    //             map.set(month, 1);
-                    //         }
-                    //     });
-                    //     return map;
-                    // });
-
-                    // result.then((map) => {
-                    //     console.log(map);
-                    //     return h.response(map);
-                    // })
-
-                    // console.log(tickets);
-
-                    // for (ticket of tickets) {
-                    //     var month = monthsForJs[ticket.performance_time.getMonth()];
-                    //     if (map.has(month)) {
-                    //         map.set(month, map.get(month) + 1);
-                    //     } else {
-                    //         map.set(month, 1);
-                    //     }
-                    // }
-
-                    
-
-                    console.log(map);
-                    // return h.response(map);
-
-                    // function (err, tickets) {
-                    //     tickets.forEach(ticket => {
-                    //         var month = monthsForJs[ticket.performance_time.getMonth()];
-                    //         if (map.has(month)) {
-                    //             map.set(month, map.get(month) + 1);
-                    //         } else {
-                    //             map.set(month, 1);
-                    //         }
-                    //     });
-                    // }
-                }
-
                 if (!called) {
                     try {
                         const aggregate = await Tickets.aggregate(getAggregationQuery('profit', startDate, endDate)).exec((err, result) => {
@@ -165,7 +98,7 @@ module.exports = [
                         return h.response(err).code(500);
                     }
                 }
-                
+
             },
             description: 'Get Profit month wise',
             notes: 'Responds with profit montly for given dates',
@@ -186,18 +119,12 @@ module.exports = [
     // example response: [{month: 'September', summaryVisits: 800}, {month: 'October', summaryVisits: 600}, ...]
     {
         method: "GET",
-        path: context + "/visits",
+        path: context + "/visits/aggregate",
         config: {
             handler: async (request, h) => {
                 var startDate = new Date(request.query.startDate);
                 var endDate = new Date(request.query.endDate);
                 var data = [];
-
-                var method = request.query.method;
-                if (method != "" && method === 'js') {
-                    return getData('profit', startDate, endDate);
-                }
-
                 try {
                     const aggregate = Tickets.aggregate(getAggregationQuery('visits', startDate, endDate)).exec((err, result) => {
                         if (err) throw err;
@@ -205,7 +132,7 @@ module.exports = [
                             data.push({
                                 month: months[val._id.month],
                                 summaryVisits: val.numberofbookings
-                            })
+                            });
                         }
                         return h.response(data);
                     });
@@ -220,12 +147,90 @@ module.exports = [
             validate: {
                 query: {
                     startDate: Joi.date().required(),
-                    endDate: Joi.date().required(),
-                    method: Joi.string().optional().description('Can take either "js" or "aggregation"')
+                    endDate: Joi.date().required()
+                },
+            }
+        }
+    },
+
+    {
+        method: "GET",
+        path: context + "/visits",
+        config: {
+            handler: async (request, h) => {
+                var startDate = new Date(request.query.startDate);
+                var endDate = new Date(request.query.endDate);
+                let map = new Map();
+
+                try {
+                    await Tickets.find({
+                        performance_time: { $gte: startDate, $lt: endDate }
+                    }).lean().exec((err, result) => {
+                        if (err) throw err;
+                        for (ticket of result) {
+                            var month = monthsForJs[ticket.performance_time.getMonth()];
+                            if (map.has(month)) {
+                                map.set(month, map.get(month) + 1);
+                            } else {
+                                map.set(month, 1);
+                            }
+                        }
+                        console.log(map);
+                        return h.response(JSON.stringify(map));
+                    });
+                } catch (err) {
+                    console.log(err);
+                    return h.response(err).code(500);
+                }
+            },
+            description: 'Get number of Visits month wise using JS Algo',
+            notes: 'Responds with number of visits montly for given dates using JS Algo',
+            tags: ['api'],
+            validate: {
+                query: {
+                    startDate: Joi.date().required(),
+                    endDate: Joi.date().required()
                 },
             }
         }
     }
+
+
+    // {
+    //     method: "GET",
+    //     path: context + "/visits",
+    //     config: {
+    //         handler: async (request, h) => {
+    //             var startDate = new Date(request.query.startDate);
+    //             var endDate = new Date(request.query.endDate);
+    //             var data = [];
+    //             var map = new Map();
+
+    //             const tickets = await Tickets.find({
+    //                 performance_time: { $gte: startDate, $lt: endDate }
+    //             }).lean().exec((err, result) => {
+    //                 result.forEach((ticket) => {
+    //                     var month = monthsForJs[ticket.performance_time.getMonth()];
+    //                     if (map.has(month)) {
+    //                         map.set(month, map.get(month) + 1);
+    //                     } else {
+    //                         map.set(month, 1);
+    //                     }
+    //                 });
+    //             });
+    //         }
+
+    //     },
+    //     description: 'Get number of Visits month wise using JS Algo',
+    //     notes: 'Responds with number of visits montly for given dates using JS Algo',
+    //     tags: ['api'],
+    //     validate: {
+    //         query: {
+    //             startDate: Joi.date().required(),
+    //             endDate: Joi.date().required()
+    //         },
+    //     }
+    // }
 
 
 ];

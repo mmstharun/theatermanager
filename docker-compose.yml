@@ -1,0 +1,33 @@
+version: '3'
+
+services: 
+  database:
+    image: 'mongo'
+    container_name: 'ticketmanager-mongo'
+    environment: 
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_USER_PASS}
+      - MONGO_INITDB_DATABASE=${MONGO_APP_DATABASE}
+    volumes:
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+      - ./mongo-volume:/data/db
+    ports:
+      - '27017:27017'
+
+  backend:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    image: "ticketmanager"
+    environment: 
+      - MONGO_USERNAME=${MONGO_APP_DB_USER}
+      - MONGO_HOSTNAME=${MONGO_APP_DB_HOST}
+      - MONGO_PASSWORD=${MONGO_APP_DB_PASS}
+      - MONGO_PORT=${MONGO_APP_DB_PORT}
+      - MONGO_DB=${MONGO_APP_DATABASE}
+      - HOSTNAME=${APP_HOSTNAME}
+      - PORT=${APP_PORT}
+    ports: 
+      - "3000:3000"
+    links: 
+      - "database"
